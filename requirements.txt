@@ -1,0 +1,4 @@
+os
+simplegmail
+google.generativeai
+dotenv
