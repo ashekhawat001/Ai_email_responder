@@ -1,5 +1,6 @@
 import os
 import google.generativeai as genai
+import time
 from simplegmail import Gmail
 from simplegmail.query import construct_query
 from dotenv import load_dotenv
@@ -24,10 +25,10 @@ promt="""your role is to reply to customers of XYZ marketing agency. Write a pro
 
 
     if body of email is empty then don't generate any response
-    Also keep in kind to give the generated text in proper formamting by using next line \ + n etc
+    Also keep in kind to give the generated text in proper formamting by using next line "\" + n etc
 
     but keep in mind customers can inquire about other things like jobs posted by the agency or updates on ongoing work with the agency in those cases dont spin up facts just tell them to wait and that someone will resolve their query shortly
-    IF THE query by customer is irrelevant keep the reply to one line
+    IF THE query by customer is irrelevant keep the reply to one or two line
 
     input email :"""
 
@@ -36,51 +37,56 @@ gmail = Gmail()
 
 
 query_params={
-    "newer_than" : (1, "days")
+    "newer_than" : (1, 'day')
 }
 
-messages = gmail.get_unread_messages(query=construct_query(query_params))
 
-count=0
-for message in messages:
-    with open("email_store.txt", "w", encoding='utf-8') as store:
-        fields = ["To", "From", "Subject", "Date"]
-        values = [message.recipient, message.sender, message.subject, message.date]
 
-        for field, value in zip(fields, values):
-            store.write(f"{field}: {value}\n")
-        if message.plain:            
-            store.write("body" + message.plain)
-        else:
-            store.write("body: ")
-    count+=1
-     
-    with open('email_store.txt', 'r', encoding='utf-8') as store:
-        email_content = store.read() 
 
-    response = model.generate_content(str(promt+email_content))
+while True:
+    messages = gmail.get_unread_messages(query=construct_query(query_params))
+    count=0
+    for message in messages:
+        with open("email_store.txt", "w", encoding='utf-8') as store:
+            fields = ["From", "Subject", "Date"]
+            values = [message.sender, message.subject, message.date]
 
-    msg_html = str(response.text)
-    msg_html = msg_html.replace("\n", "<br>")
-    
-    params = {
-        "to": "7ik4h.test@inbox.testmail.app",
-        "sender": message.recipient,
-        "subject": "re"+ message.subject,
-        "msg_html": msg_html,
+            for field, value in zip(fields, values):
+                store.write(f"{field}: {value}\n")
+            if message.plain:            
+                store.write("body" + message.plain)
+            else:
+                store.write("body: ")
+        count+=1
         
-    }
+        with open('email_store.txt', 'r', encoding='utf-8') as store:
+            email_content = store.read() 
 
-    message = gmail.send_message(**params)  # equivalent to send_message(to="you@youremail.com", sender=...)
+        response = model.generate_content(str(promt+email_content))
+
+        msg_html = str(response.text)
+        msg_html = msg_html.replace("\n", "<br>")
+        
+        params = {
+            "to": message.sender,
+            "sender": message.recipient,
+            "subject": "re"+ message.subject,
+            "msg_html": msg_html,
+            
+        }
+
+        message_to_send = gmail.send_message(**params)  # equivalent to send_message(to="you@youremail.com", sender=...)
+        mark_as_read = message.mark_as_read()
+        print(response.text)
+        print("Message sent successfully")
+    print("finished Found "+ str( count) +" messages")       
+    time.sleep(10)    
+
+
+
     
-    print(response.text)
-    print("Message sent successfully")
 
 
-
-    
-
-print("finished Found "+ str( count) +" messages")        
     
     
 
